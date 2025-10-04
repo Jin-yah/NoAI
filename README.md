@@ -15,11 +15,15 @@ NoAI is a simple Chrome extension that allows you to block or hide the AI-powere
 
 ## Disclaimer
 
-This extension relies on the structure of Google's search results page. Google may change the structure of their page at any time, which may cause this extension to stop working. If you notice that the extension is not working, please open an issue on the GitHub repository.
+This extension relies on the structure of Google's search results page. Google may change the structure of its page at any time, which may cause this extension to stop working. If you notice that the extension is not working, please open an issue on the GitHub repository.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Attributions
+
+logic for handling other languages partially adapted from zbarnz's "Google_AI_Overviews_Blocker" (https://github.com/zbarnz/Google_AI_Overviews_Blocker) extension
 
 ## Contributing
 
