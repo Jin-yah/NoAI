@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NoAI • Google</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <div class="title">NoAI</div>
+        <div class="mode-name" id="current-mode">Hidden</div>
+        <div class="mode-desc" id="mode-desc">
+          Hides AI response cards from Google results.
+        </div>
+      </header>
+
+      <section class="control">
+        <div class="slider-wrap">
+          <input
+            type="range"
+            min="0"
+            max="2"
+            value="1"
+            id="levelSlider"
+            class="slider"
+          />
+          <div class="ticks" id="ticks">
+            <span class="tick"></span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="counter">
+          AI responses blocked: <strong id="blocked-count">0</strong>
+        </div>
+      </footer>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
