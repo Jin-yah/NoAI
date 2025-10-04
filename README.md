@@ -21,9 +21,14 @@ This extension relies on the structure of Google's search results page. Google m
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Privacy Policy
+
+Please review the [Privacy Policy](PRIVACY.md) for information about how your data is handled.
+
+
 ## Attributions
 
-logic for handling other languages partially adapted from zbarnz's "Google_AI_Overviews_Blocker" (https://github.com/zbarnz/Google_AI_Overviews_Blocker) extension
+Logic for handling other languages partially adapted from zbarnz's [Google_AI_Overviews_Blocker](https://github.com/zbarnz/Google_AI_Overviews_Blocker) extension.
 
 ## Contributing
 
