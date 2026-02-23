@@ -1,11 +1,13 @@
-// Set default values on installation
-chrome.runtime.onInstalled.addListener(() => {
-  // Blocker level is device-specific
-  chrome.storage.local.set({ blockerLevel: "Hidden" });
-  // Synced count starts at 0
-  chrome.storage.sync.set({ blockedCount: 0 });
-  // Local count also starts at 0
-  chrome.storage.local.set({ localBlockedCount: 0 });
+// Set default values on first installation only (not on extension updates)
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
+    // Blocker level is device-specific
+    chrome.storage.local.set({ blockerLevel: "Hidden" });
+    // Synced count starts at 0
+    chrome.storage.sync.set({ blockedCount: 0 });
+    // Local count also starts at 0
+    chrome.storage.local.set({ localBlockedCount: 0 });
+  }
 });
 
 // Create a periodic alarm for syncing the blocked count
