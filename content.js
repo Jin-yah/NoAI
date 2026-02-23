@@ -48,7 +48,11 @@ function hideAIResults() {
     );
 
     var aiOverview = aiText?.closest("div#rso > div"); // AI overview as a search result
+    // Guard: if this container holds multiple regular search results it is a generic
+    // wrapper, not the AI overview block — skip it to avoid hiding all results.
+    if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
     if (!aiOverview) aiOverview = aiText?.closest("div#rcnt > div"); // AI overview above search results
+    if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
 
     // Hide AI overview
     if (aiOverview && aiOverview.style.display !== "none") {
