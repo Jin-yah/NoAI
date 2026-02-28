@@ -51,8 +51,17 @@ function hideAIResults() {
     // Guard: if this container holds multiple regular search results it is a generic
     // wrapper, not the AI overview block — skip it to avoid hiding all results.
     if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
+    // Guard: if this container holds other typed result blocks (e.g. a Videos carousel
+    // that appears before the AI overview), it is a shared wrapper — narrow down to
+    // only the child element that actually contains the AI overview text.
+    if (aiOverview && aiOverview.querySelectorAll("div.A6K0A[data-rpos]").length >= 1) {
+      aiOverview = [...aiOverview.children].find((c) => c.contains(aiText)) || null;
+    }
     if (!aiOverview) aiOverview = aiText?.closest("div#rcnt > div"); // AI overview above search results
     if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
+    if (aiOverview && aiOverview.querySelectorAll("div.A6K0A[data-rpos]").length >= 1) {
+      aiOverview = [...aiOverview.children].find((c) => c.contains(aiText)) || null;
+    }
 
     // Hide AI overview
     if (aiOverview && aiOverview.style.display !== "none") {
@@ -115,9 +124,9 @@ function hideAIResults() {
 // Helper: increment localBlockedCount in storage by a given amount
 function incrementLocalBlockCount(amount = 1) {
   if (amount === 0) return;
-  chrome.storage.local.get({ localBlockedCount: 0 }, (data) => {
-    const next = Number(data.localBlockedCount || 0) + amount;
-    chrome.storage.local.set({ localBlockedCount: next });
+  chrome.storage.local.get({ blockedCount: 0 }, (data) => {
+    const next = Number(data.blockedCount || 0) + amount;
+    chrome.storage.local.set({ blockedCount: next });
   });
 }
 
