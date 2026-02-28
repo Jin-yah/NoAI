@@ -26,11 +26,8 @@ function updateSliderFill() {
 }
 
 function updateTotalBlockedCount() {
-  chrome.storage.sync.get({ blockedCount: 0 }, (syncData) => {
-    chrome.storage.local.get({ localBlockedCount: 0 }, (localData) => {
-      const total = (syncData.blockedCount || 0) + (localData.localBlockedCount || 0);
-      blockedCountEl.textContent = total;
-    });
+  chrome.storage.local.get({ blockedCount: 0 }, (localData) => {
+    blockedCountEl.textContent = Number(localData.blockedCount) || 0;
   });
 }
 
@@ -53,9 +50,9 @@ slider.addEventListener("input", function () {
   updateSliderFill();
 });
 
-// Listen for updates to the blocked count in both sync and local storage
+// Listen for updates to the blocked count in local storage
 chrome.storage.onChanged.addListener(function (changes, namespace) {
-  if (changes.blockedCount || changes.localBlockedCount) {
+  if (namespace === "local" && changes.blockedCount) {
     updateTotalBlockedCount();
   }
 });

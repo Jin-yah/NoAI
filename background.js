@@ -1,13 +1,27 @@
-// Set default values on first installation only (not on extension updates)
+// Set default values on first install; migrate key on updates
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
     // Blocker level is device-specific
     chrome.storage.local.set({ blockerLevel: "Hidden" });
-    // Synced count starts at 0
-    chrome.storage.sync.set({ blockedCount: 0 });
-    // Local count also starts at 0
-    chrome.storage.local.set({ localBlockedCount: 0 });
+    // Pull any existing cloud count down (e.g. re-install on a known device)
+    syncBlockedCount();
+  } else if (details.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+    // Migrate old split-key design: localBlockedCount (local delta) + blockedCount (sync total)
+    // Collapse any unsync'd local delta into the new unified local key, then sync.
+    chrome.storage.local.get({ localBlockedCount: 0, blockedCount: 0 }, (localData) => {
+      const migrated =
+        (Number(localData.blockedCount) || 0) +
+        (Number(localData.localBlockedCount) || 0);
+      chrome.storage.local.set({ blockedCount: migrated, localBlockedCount: 0 }, () => {
+        syncBlockedCount();
+      });
+    });
   }
+});
+
+// On browser startup pull the cloud count so a new/re-logged-in device is up to date
+chrome.runtime.onStartup.addListener(() => {
+  syncBlockedCount();
 });
 
 // Create a periodic alarm for syncing the blocked count
@@ -22,19 +36,21 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-// Function to sync the local count to the synced count
+// Sync strategy: both local and cloud store the full running total.
+// Whichever side is higher wins; both are updated to the max.
 function syncBlockedCount() {
-  chrome.storage.local.get({ localBlockedCount: 0 }, (localData) => {
-    if (localData.localBlockedCount > 0) {
-      chrome.storage.sync.get({ blockedCount: 0 }, (syncData) => {
-        const newTotal =
-          (syncData.blockedCount || 0) + (localData.localBlockedCount || 0);
-        chrome.storage.sync.set({ blockedCount: newTotal }, () => {
-          // After successful sync, reset the local count
-          chrome.storage.local.set({ localBlockedCount: 0 });
-        });
-      });
-    }
+  chrome.storage.local.get({ blockedCount: 0 }, (localData) => {
+    chrome.storage.sync.get({ blockedCount: 0 }, (syncData) => {
+      const localCount = Number(localData.blockedCount) || 0;
+      const syncCount = Number(syncData.blockedCount) || 0;
+      const merged = Math.max(localCount, syncCount);
+      if (merged !== syncCount) {
+        chrome.storage.sync.set({ blockedCount: merged });
+      }
+      if (merged !== localCount) {
+        chrome.storage.local.set({ blockedCount: merged });
+      }
+    });
   });
 }
 
@@ -57,10 +73,10 @@ chrome.webNavigation.onCompleted.addListener(
   }
 );
 
-// Helper: increment localBlockedCount in storage by 1
+// Helper: increment local blockedCount in storage by 1
 function incrementLocalBlockCount() {
-  chrome.storage.local.get({ localBlockedCount: 0 }, (data) => {
-    const next = Number(data.localBlockedCount || 0) + 1;
-    chrome.storage.local.set({ localBlockedCount: next });
+  chrome.storage.local.get({ blockedCount: 0 }, (data) => {
+    const next = Number(data.blockedCount || 0) + 1;
+    chrome.storage.local.set({ blockedCount: next });
   });
 }
