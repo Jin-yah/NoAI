@@ -26,6 +26,145 @@ function initializeNoAI() {
   });
 }
 
+const AI_OVERVIEW_CANDIDATE_SELECTOR = [
+  "h1",
+  "h2",
+  "h3",
+  '[role="heading"]',
+  '[aria-level]'
+].join(", ");
+
+function matchesAiOverviewPattern(text, patterns) {
+  const normalizedText = (text || "").replace(/\s+/g, " ").trim();
+  return patterns.some((pattern) => pattern.test(normalizedText));
+}
+
+function elementContainsAiPattern(element, patterns, includeHiddenText = false) {
+  if (!element) return false;
+
+  const texts = [
+    includeHiddenText ? element.textContent : (element.innerText || element.textContent),
+    element.getAttribute?.("aria-label"),
+    element.getAttribute?.("data-q"),
+  ].filter(Boolean);
+
+  return texts.some((text) => matchesAiOverviewPattern(text, patterns));
+}
+
+function findAiOverviewHeading(mainBody, patterns) {
+  const candidates = [
+    ...(mainBody?.querySelectorAll(AI_OVERVIEW_CANDIDATE_SELECTOR) || []),
+  ];
+
+  return candidates.find((element) =>
+    !element.closest(".related-question-pair") &&
+    !element.closest('[data-ispaa="1"]') &&
+    matchesAiOverviewPattern(element.innerText || element.textContent, patterns)
+  );
+}
+
+function getContainerWithinRoot(element, rootSelector) {
+  const root = document.querySelector(rootSelector);
+  if (!root || !element || !root.contains(element)) return null;
+
+  let current = element;
+  while (current.parentElement && current.parentElement !== root) {
+    current = current.parentElement;
+  }
+
+  return current.parentElement === root ? current : null;
+}
+
+function narrowAiOverviewContainer(container, aiHeading) {
+  if (!container) return null;
+
+  const directChildWithHeading = [...container.children].find((child) =>
+    child.contains(aiHeading)
+  );
+
+  const resultLikeChildren = [...container.children].filter(
+    (child) =>
+      child.matches(".g, .MjjYud, [data-rpos]") ||
+      child.querySelector(".g, .MjjYud, [data-rpos]")
+  );
+
+  if (resultLikeChildren.length >= 2 && directChildWithHeading) {
+    return directChildWithHeading;
+  }
+
+  return container;
+}
+
+function findExplicitAiOverviewContainer(aiHeading) {
+  if (!aiHeading) return null;
+
+  return (
+    aiHeading.closest('[data-lhcontainer="1"]') ||
+    aiHeading.closest('[jscontroller="EYwa3d"][data-loaded="1"]') ||
+    aiHeading.closest('[data-subtree="mfc"]')
+  );
+}
+
+function findPeopleAlsoAskAiRows(patterns) {
+  const peopleAlsoAskAll = [
+    ...document.querySelectorAll("div.related-question-pair"),
+  ];
+
+  const peopleAlsoAskAiOverviews = peopleAlsoAskAll.filter((element) =>
+    elementContainsAiPattern(element, patterns, true)
+  );
+
+  return {
+    peopleAlsoAskAll,
+    peopleAlsoAskAiOverviews,
+  };
+}
+
+function hidePeopleAlsoAskAiRows(patterns) {
+  const { peopleAlsoAskAll, peopleAlsoAskAiOverviews } = findPeopleAlsoAskAiRows(patterns);
+  let blockedCount = 0;
+
+  peopleAlsoAskAiOverviews.forEach((element) => {
+    const rowWrapper = element.closest('[jsname="yEVEwb"]') || element.parentElement?.parentElement;
+    if (rowWrapper && rowWrapper.style.display !== "none") {
+      rowWrapper.style.display = "none";
+      blockedCount++;
+      console.log("NoAI: Hid People also ask AI overview");
+    }
+  });
+
+  incrementLocalBlockCount(blockedCount);
+
+  if (
+    peopleAlsoAskAiOverviews.length === peopleAlsoAskAll.length &&
+    peopleAlsoAskAll.length > 0
+  ) {
+    const sectionWrapper = peopleAlsoAskAll[0].closest(".MjjYud") || peopleAlsoAskAll[0].closest('[data-ispaa="1"]');
+    if (sectionWrapper && sectionWrapper.style.display !== "none") {
+      sectionWrapper.style.display = "none";
+      console.log("NoAI: Hid entire People also ask section");
+    }
+  }
+}
+
+function findAiOverviewContainer(aiHeading) {
+  const explicitContainer = findExplicitAiOverviewContainer(aiHeading);
+  if (explicitContainer) return explicitContainer;
+
+  const rootSelectors = ["div#rso", "div#rcnt", "div#center_col", '[role="main"]'];
+
+  for (const rootSelector of rootSelectors) {
+    const container = narrowAiOverviewContainer(
+      getContainerWithinRoot(aiHeading, rootSelector),
+      aiHeading
+    );
+
+    if (container) return container;
+  }
+
+  return null;
+}
+
 // This function was largely adapted from zbarnz "Google_AI_Overviews_Blocker" (https://github.com/zbarnz/Google_AI_Overviews_Blocker) extension
 function hideAIResults() {
   const patterns = [
@@ -40,85 +179,50 @@ function hideAIResults() {
     /Přehled od AI/i, // cz
   ];
 
-  const observer = new MutationObserver(() => {
-    // each time there's a mutation in the document see if there's an ai overview to hide
+  const applyAiHiding = () => {
     const mainBody = document.querySelector("div#rcnt");
-    const aiText = [...(mainBody?.querySelectorAll("h1, h2") || [])].find((e) =>
-      patterns.some((pattern) => pattern.test(e.innerText))
-    );
+    const aiText = findAiOverviewHeading(mainBody, patterns);
+    const aiOverview = findAiOverviewContainer(aiText);
+    let aiWasHidden = false;
 
-    var aiOverview = aiText?.closest("div#rso > div"); // AI overview as a search result
-    // Guard: if this container holds multiple regular search results it is a generic
-    // wrapper, not the AI overview block — skip it to avoid hiding all results.
-    if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
-    // Guard: if this container holds other typed result blocks (e.g. a Videos carousel
-    // that appears before the AI overview), it is a shared wrapper — narrow down to
-    // only the child element that actually contains the AI overview text.
-    if (aiOverview && aiOverview.querySelectorAll("div.A6K0A[data-rpos]").length >= 1) {
-      aiOverview = [...aiOverview.children].find((c) => c.contains(aiText)) || null;
-    }
-    if (!aiOverview) aiOverview = aiText?.closest("div#rcnt > div"); // AI overview above search results
-    if (aiOverview && aiOverview.querySelectorAll(".g").length >= 2) aiOverview = null;
-    if (aiOverview && aiOverview.querySelectorAll("div.A6K0A[data-rpos]").length >= 1) {
-      aiOverview = [...aiOverview.children].find((c) => c.contains(aiText)) || null;
-    }
-
-    // Hide AI overview
     if (aiOverview && aiOverview.style.display !== "none") {
       aiOverview.style.display = "none";
       incrementLocalBlockCount();
+      aiWasHidden = true;
       console.log("NoAI: Hid AI overview");
     }
+
+    return aiWasHidden || aiOverview?.style.display === "none";
+  };
+
+  const observer = new MutationObserver(() => {
+    // each time there's a mutation in the document see if there's an ai overview to hide
+    const aiOverviewHidden = applyAiHiding();
 
     // Restore padding after header tabs
     const headerTabs = document.querySelector("div#hdtb-sc > div");
     if (headerTabs) headerTabs.style.paddingBottom = "12px";
 
-    // For debugging
-    // console.log([...mainBody?.querySelectorAll('h1, h2')].map(e => { return { text: e.innerText, obj: e }}));
     const mainElement = document.querySelector('[role="main"]');
     if (mainElement) {
-      mainElement.style.marginTop = "24px";
+      mainElement.style.marginTop = aiOverviewHidden ? "0" : "24px";
     }
 
     // Remove entries in "People also ask" section if it contains "AI overview"
-    const peopleAlsoAskAll = [
-      ...document.querySelectorAll("div.related-question-pair"),
-    ];
-
-    const peopleAlsoAskAiOverviews = peopleAlsoAskAll.filter((el) =>
-      patterns.some((pattern) => pattern.test(el.innerHTML))
-    );
-
-    let blockedCount = 0;
-
-    peopleAlsoAskAiOverviews.forEach((el) => {
-      const aiOverview = el.parentElement.parentElement;
-      if (aiOverview.style.display !== "none") {
-        aiOverview.style.display = "none";
-        blockedCount++;
-        console.log("NoAI: Hid People also ask AI overview");
-      }
-    });
-
-    incrementLocalBlockCount(blockedCount);
-
-    if (
-      peopleAlsoAskAiOverviews.length == peopleAlsoAskAll.length &&
-      peopleAlsoAskAll.length > 0
-    ) {
-      const sectionWrapper = peopleAlsoAskAll[0].closest(".MjjYud");
-      if (sectionWrapper && sectionWrapper.style.display !== "none") {
-        sectionWrapper.style.display = "none";
-        console.log("NoAI: Hid entire People also ask section");
-      }
-    }
+    hidePeopleAlsoAskAiRows(patterns);
   });
 
   observer.observe(document, {
     childList: true,
     subtree: true,
   });
+
+  const aiOverviewHidden = applyAiHiding();
+  const mainElement = document.querySelector('[role="main"]');
+  if (mainElement) {
+    mainElement.style.marginTop = aiOverviewHidden ? "0" : "24px";
+  }
+  hidePeopleAlsoAskAiRows(patterns);
 }
 
 // Helper: increment localBlockedCount in storage by a given amount
